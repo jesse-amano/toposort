@@ -1,6 +1,7 @@
 package toposort
 
-// Graph represents a directed graph.
+// Graph represents a directed graph. It is not safe
+// for use by concurrent goroutines.
 type Graph struct {
 	nodes   []string
 	outputs map[string]map[string]int
@@ -95,6 +96,15 @@ func (g *Graph) RemoveEdge(from, to string) error {
 // of the nodes in the graph.
 func (g *Graph) Toposort() ([]Interface, error) {
 	g.initialize()
+	return clone(g).DestructiveToposort()
+}
+
+// DestructiveToposort returns a slice representing a topological ordering
+// of the nodes in the graph. It is significantly faster than Toposort but
+// alters the structure of the underlying graph. Call Toposort instead if
+// you want to reuse the graph structure.
+func (g *Graph) DestructiveToposort() ([]Interface, error) {
+	g.initialize()
 	names, err := g.toposort()
 	elements := make([]Interface, len(names))
 	if err != nil {
@@ -159,4 +169,28 @@ func (g *Graph) initialize() {
 	g.inputs = make(map[string]int)
 	g.outputs = make(map[string]map[string]int)
 	g.objects = make(map[string]Interface)
+}
+
+func clone(g *Graph) *Graph {
+	if g == nil {
+		return nil
+	}
+	var h Graph
+	h.nodes = make([]string, len(g.nodes))
+	copy(h.nodes, g.nodes)
+	h.inputs = make(map[string]int, len(g.inputs))
+	for k, v := range g.inputs {
+		h.inputs[k] = v
+	}
+	h.outputs = make(map[string]map[string]int, len(g.outputs))
+	for k, v := range g.outputs {
+		h.outputs[k] = make(map[string]int, len(v))
+		for ik, iv := range v {
+			h.outputs[k][ik] = iv
+		}
+	}
+	h.objects = make(map[string]Interface, len(g.objects))
+	for k, v := range g.objects {
+		h.objects[k] = v
+	}
 }
