@@ -193,4 +193,5 @@ func clone(g *Graph) *Graph {
 	for k, v := range g.objects {
 		h.objects[k] = v
 	}
+	return &h
 }
