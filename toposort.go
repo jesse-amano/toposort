@@ -23,6 +23,7 @@ func NewGraph(cap int) *Graph {
 // a string or stringer, it will be converted to a toposort.Interface
 // value whose Name is equal to the string value of element.
 func (g *Graph) AddNode(element interface{}) error {
+	g.initialize()
 	if el, ok := element.(Interface); ok {
 		return g.addNode(el)
 	}
@@ -63,6 +64,7 @@ func (g *Graph) AddNodes(elements ...interface{}) error {
 // The first edge will be required to appear before the second
 // when the graph is traversed in topological order.
 func (g *Graph) AddEdge(from, to string) error {
+	g.initialize()
 	m, ok := g.outputs[from]
 	if !ok {
 		return ErrNodeNotFound
@@ -81,6 +83,7 @@ func (g *Graph) unsafeRemoveEdge(from, to string) {
 
 // RemoveEdge removes an edge from one node to another.
 func (g *Graph) RemoveEdge(from, to string) error {
+	g.initialize()
 	if _, ok := g.outputs[from]; !ok {
 		return ErrNodeNotFound
 	}
@@ -91,6 +94,7 @@ func (g *Graph) RemoveEdge(from, to string) error {
 // Toposort returns a slice representing a topological ordering
 // of the nodes in the graph.
 func (g *Graph) Toposort() ([]Interface, error) {
+	g.initialize()
 	names, err := g.toposort()
 	elements := make([]Interface, len(names))
 	if err != nil {
@@ -145,4 +149,14 @@ func (g *Graph) toposort() ([]string, error) {
 	}
 
 	return L, nil
+}
+
+func (g *Graph) initialize() {
+	if g.objects != nil {
+		return
+	}
+	g.nodes = make([]string, 0)
+	g.inputs = make(map[string]int)
+	g.outputs = make(map[string]map[string]int)
+	g.objects = make(map[string]Interface)
 }
