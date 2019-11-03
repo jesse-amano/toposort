@@ -70,6 +70,10 @@ func (g *Graph) AddEdge(from, to string) error {
 	if !ok {
 		return ErrNodeNotFound
 	}
+	_, ok = g.objects[to]
+	if !ok {
+		return ErrNodeNotFound
+	}
 
 	m[to] = len(m) + 1
 	g.inputs[to]++
@@ -85,8 +89,13 @@ func (g *Graph) unsafeRemoveEdge(from, to string) {
 // RemoveEdge removes an edge from one node to another.
 func (g *Graph) RemoveEdge(from, to string) error {
 	g.initialize()
-	if _, ok := g.outputs[from]; !ok {
+	if _, ok := g.objects[to]; !ok {
 		return ErrNodeNotFound
+	}
+	if m, ok := g.outputs[from]; !ok {
+		return ErrNodeNotFound
+	} else if _, ok = m[to]; !ok {
+		return ErrEdgeNotFound
 	}
 	g.unsafeRemoveEdge(from, to)
 	return nil

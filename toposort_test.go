@@ -27,10 +27,36 @@ func TestDuplicatedNode(t *testing.T) {
 	}
 }
 
+func TestAddInvalidEdge(t *testing.T) {
+	var graph Graph
+	if err := graph.AddEdge("a", "b"); err != ErrNodeNotFound {
+		t.Errorf("nodes do not exist but AddEdge returned %v", err)
+	}
+	graph.AddNode("a")
+	if err := graph.AddEdge("a", "b"); err != ErrNodeNotFound {
+		t.Errorf("b does not exist but AddEdge returned %v", err)
+	}
+	if err := graph.AddEdge("c", "a"); err != ErrNodeNotFound {
+		t.Errorf("c does not exist but AddEdge returned %v", err)
+	}
+}
+
 func TestRemoveNotExistEdge(t *testing.T) {
 	graph := NewGraph(0)
 	if err := graph.RemoveEdge("a", "b"); err != ErrNodeNotFound {
-		t.Errorf("not raising not exist edge error")
+		t.Errorf("nodes do not exist but RemoveEdge returned %v", err)
+	}
+	graph.AddNode("a")
+	if err := graph.RemoveEdge("a", "b"); err != ErrNodeNotFound {
+		t.Errorf("a does not exist but RemoveEdge returned %v", err)
+	}
+	graph.AddNode("b")
+	if err := graph.RemoveEdge("a", "b"); err != ErrEdgeNotFound {
+		t.Errorf("edge does not exist but RemoveEdge returned %v", err)
+	}
+	graph.AddEdge("b", "a")
+	if err := graph.RemoveEdge("a", "b"); err != ErrEdgeNotFound {
+		t.Errorf("edge is b→a but RemoveEdge returned %v", err)
 	}
 }
 

@@ -5,6 +5,7 @@ type GraphError int
 const (
 	ErrNodeExists GraphError = iota
 	ErrNodeNotFound
+	ErrEdgeNotFound
 	ErrUnsupportedType
 	ErrCycle
 	ErrUnknown
@@ -16,6 +17,8 @@ func (err GraphError) Error() string {
 		return "toposort: node already exists"
 	case ErrNodeNotFound:
 		return "toposort: node not found"
+	case ErrEdgeNotFound:
+		return "toposort: edge not found"
 	case ErrUnsupportedType:
 		return "toposort: unsupported type"
 	case ErrCycle:
