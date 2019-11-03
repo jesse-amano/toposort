@@ -1,10 +1,13 @@
 package toposort
 
-import "testing"
+import (
+	"fmt"
+	"testing"
+)
 
-func index(s []string, v string) int {
+func index(s []Interface, v string) int {
 	for i, s := range s {
-		if s == v {
+		if s.Name() == v {
 			return i
 		}
 	}
@@ -19,16 +22,41 @@ type Edge struct {
 func TestDuplicatedNode(t *testing.T) {
 	graph := NewGraph(2)
 	graph.AddNode("a")
-	if graph.AddNode("a") {
+	if err := graph.AddNode("a"); err != ErrNodeExists {
 		t.Errorf("not raising duplicated node error")
 	}
+}
 
+func TestAddInvalidEdge(t *testing.T) {
+	var graph Graph
+	if err := graph.AddEdge("a", "b"); err != ErrNodeNotFound {
+		t.Errorf("nodes do not exist but AddEdge returned %v", err)
+	}
+	graph.AddNode("a")
+	if err := graph.AddEdge("a", "b"); err != ErrNodeNotFound {
+		t.Errorf("b does not exist but AddEdge returned %v", err)
+	}
+	if err := graph.AddEdge("c", "a"); err != ErrNodeNotFound {
+		t.Errorf("c does not exist but AddEdge returned %v", err)
+	}
 }
 
 func TestRemoveNotExistEdge(t *testing.T) {
 	graph := NewGraph(0)
-	if graph.RemoveEdge("a", "b") {
-		t.Errorf("not raising not exist edge error")
+	if err := graph.RemoveEdge("a", "b"); err != ErrNodeNotFound {
+		t.Errorf("nodes do not exist but RemoveEdge returned %v", err)
+	}
+	graph.AddNode("a")
+	if err := graph.RemoveEdge("a", "b"); err != ErrNodeNotFound {
+		t.Errorf("a does not exist but RemoveEdge returned %v", err)
+	}
+	graph.AddNode("b")
+	if err := graph.RemoveEdge("a", "b"); err != ErrEdgeNotFound {
+		t.Errorf("edge does not exist but RemoveEdge returned %v", err)
+	}
+	graph.AddEdge("b", "a")
+	if err := graph.RemoveEdge("a", "b"); err != ErrEdgeNotFound {
+		t.Errorf("edge is b→a but RemoveEdge returned %v", err)
 	}
 }
 
@@ -56,9 +84,9 @@ func TestWikipedia(t *testing.T) {
 		graph.AddEdge(e.From, e.To)
 	}
 
-	result, ok := graph.Toposort()
-	if !ok {
-		t.Errorf("closed path detected in no closed pathed graph")
+	result, err := graph.Toposort()
+	if err != nil {
+		t.Errorf("error sorting valid DAG: %v", err)
 	}
 
 	for _, e := range edges {
@@ -76,8 +104,66 @@ func TestCycle(t *testing.T) {
 	graph.AddEdge("2", "3")
 	graph.AddEdge("3", "1")
 
-	_, ok := graph.Toposort()
-	if ok {
-		t.Errorf("closed path not detected in closed pathed graph")
+	_, err := graph.Toposort()
+	if err == nil {
+		t.Error("closed path not detected in closed pathed graph")
 	}
+}
+
+func TestStructured(t *testing.T) {
+	baskets := []basket{
+		{count: 2, fruit: "bananas"},
+		{count: 3, fruit: "cantaloupes"},
+		{count: 5, fruit: "elderberries"},
+		{count: 7, fruit: "grapes"},
+		{count: 8, fruit: "honeydew melons"},
+		{count: 9, fruit: "idared apples"},
+		{count: 10, fruit: "jackfruit"},
+		{count: 11, fruit: "kumquat"},
+	}
+
+	graph := NewGraph(len(baskets))
+	for _, b := range baskets {
+		graph.AddNode(b)
+	}
+
+	edges := []Edge{
+		{"7 grapes", "8 honeydew melons"},
+		{"7 grapes", "11 kumquat"},
+
+		{"5 elderberries", "11 kumquat"},
+
+		{"3 cantaloupes", "8 honeydew melons"},
+		{"3 cantaloupes", "10 jackfruit"},
+
+		{"11 kumquat", "2 bananas"},
+		{"11 kumquat", "9 idared apples"},
+		{"11 kumquat", "10 jackfruit"},
+
+		{"8 honeydew melons", "9 idared apples"},
+	}
+
+	for _, e := range edges {
+		graph.AddEdge(e.From, e.To)
+	}
+
+	result, err := graph.Toposort()
+	if err != nil {
+		t.Errorf("error sorting valid DAG: %v", err)
+	}
+
+	for _, e := range edges {
+		if i, j := index(result, e.From), index(result, e.To); i > j {
+			t.Errorf("dependency failed: not satisfy %v(%v) > %v(%v)", e.From, i, e.To, j)
+		}
+	}
+}
+
+type basket struct {
+	count int
+	fruit string
+}
+
+func (b basket) Name() string {
+	return fmt.Sprintf("%d %s", b.count, b.fruit)
 }

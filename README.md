@@ -1,9 +1,14 @@
 go-toposort
 ==
-[![Build Status](https://travis-ci.org/philopon/go-toposort.svg?branch=master)](https://travis-ci.org/philopon/go-toposort)
-[![GoDoc](https://godoc.org/github.com/philopon/go-toposort?status.svg)](https://godoc.org/github.com/philopon/go-toposort)
+[![GoDoc](https://godoc.org/github.com/jesse-amano/toposort?status.svg)](https://godoc.org/github.com/jesse-amano/toposort)
 
-deterministic topological sort implementation for golang
+Deterministic topological sort for Go. Forked from [philopon/go-toposort](https://github.com/philopon/go-toposort).
+
+This fork of the package is extended to accommodate custom elements. If you only need to sort strings or other simple data types, check out other forks. Custom element support is achieved with safe type assertions, so performance is not maximized, but for small dependency graphs it should still be okay.
+
+License
+--
+MIT
 
 Example
 --
@@ -14,7 +19,7 @@ package main
 import (
 	"fmt"
 
-	toposort "github.com/philopon/go-toposort"
+	toposort "github.com/jesse-amano/toposort"
 )
 
 func main() {
@@ -48,6 +53,3 @@ func main() {
 [3 5 7 8 11 2 9 10]
 ```
 
-License
---
-MIT

@@ -1,49 +1,84 @@
 package toposort
 
+// Graph represents a directed graph. It is not safe
+// for use by concurrent goroutines.
 type Graph struct {
 	nodes   []string
 	outputs map[string]map[string]int
 	inputs  map[string]int
+	objects map[string]Interface
 }
 
+// NewGraph returns a new graph with an initial capacity.
 func NewGraph(cap int) *Graph {
 	return &Graph{
 		nodes:   make([]string, 0, cap),
 		inputs:  make(map[string]int),
 		outputs: make(map[string]map[string]int),
+		objects: make(map[string]Interface, cap),
 	}
 }
 
-func (g *Graph) AddNode(name string) bool {
+// AddNode adds a single node to the graph containing an element.
+// If element does not satisfy toposort.Interface but is already
+// a string or stringer, it will be converted to a toposort.Interface
+// value whose Name is equal to the string value of element.
+func (g *Graph) AddNode(element interface{}) error {
+	g.initialize()
+	if el, ok := element.(Interface); ok {
+		return g.addNode(el)
+	}
+	if str, ok := element.(string); ok {
+		return g.addNode(stringElement(str))
+	}
+	if str, ok := element.(stringer); ok {
+		return g.addNode(stringElement(str.String()))
+	}
+	return ErrUnsupportedType
+}
+
+func (g *Graph) addNode(element Interface) error {
+	name := element.Name()
+	if _, ok := g.outputs[name]; ok {
+		return ErrNodeExists
+	}
+
+	g.objects[name] = element
 	g.nodes = append(g.nodes, name)
 
-	if _, ok := g.outputs[name]; ok {
-		return false
-	}
 	g.outputs[name] = make(map[string]int)
 	g.inputs[name] = 0
-	return true
+	return nil
 }
 
-func (g *Graph) AddNodes(names ...string) bool {
-	for _, name := range names {
-		if ok := g.AddNode(name); !ok {
-			return false
+// AddNodes is a convenience method to add multiple nodes at once.
+func (g *Graph) AddNodes(elements ...interface{}) error {
+	for _, e := range elements {
+		if err := g.AddNode(e); err != nil {
+			return err
 		}
 	}
-	return true
+	return nil
 }
 
-func (g *Graph) AddEdge(from, to string) bool {
+// AddEdge creates a directed edge from one node to another.
+// The first edge will be required to appear before the second
+// when the graph is traversed in topological order.
+func (g *Graph) AddEdge(from, to string) error {
+	g.initialize()
 	m, ok := g.outputs[from]
 	if !ok {
-		return false
+		return ErrNodeNotFound
+	}
+	_, ok = g.objects[to]
+	if !ok {
+		return ErrNodeNotFound
 	}
 
 	m[to] = len(m) + 1
 	g.inputs[to]++
 
-	return true
+	return nil
 }
 
 func (g *Graph) unsafeRemoveEdge(from, to string) {
@@ -51,15 +86,50 @@ func (g *Graph) unsafeRemoveEdge(from, to string) {
 	g.inputs[to]--
 }
 
-func (g *Graph) RemoveEdge(from, to string) bool {
-	if _, ok := g.outputs[from]; !ok {
-		return false
+// RemoveEdge removes an edge from one node to another.
+func (g *Graph) RemoveEdge(from, to string) error {
+	g.initialize()
+	if _, ok := g.objects[to]; !ok {
+		return ErrNodeNotFound
+	}
+	if m, ok := g.outputs[from]; !ok {
+		return ErrNodeNotFound
+	} else if _, ok = m[to]; !ok {
+		return ErrEdgeNotFound
 	}
 	g.unsafeRemoveEdge(from, to)
-	return true
+	return nil
 }
 
-func (g *Graph) Toposort() ([]string, bool) {
+// Toposort returns a slice representing a topological ordering
+// of the nodes in the graph.
+func (g *Graph) Toposort() ([]Interface, error) {
+	g.initialize()
+	return clone(g).DestructiveToposort()
+}
+
+// DestructiveToposort returns a slice representing a topological ordering
+// of the nodes in the graph. It is significantly faster than Toposort but
+// alters the structure of the underlying graph. Call Toposort instead if
+// you want to reuse the graph structure.
+func (g *Graph) DestructiveToposort() ([]Interface, error) {
+	g.initialize()
+	names, err := g.toposort()
+	elements := make([]Interface, len(names))
+	if err != nil {
+		return elements, err
+	}
+	var ok bool
+	for i := range names {
+		elements[i], ok = g.objects[names[i]]
+		if !ok {
+			return elements, ErrNodeNotFound
+		}
+	}
+	return elements, nil
+}
+
+func (g *Graph) toposort() ([]string, error) {
 	L := make([]string, 0, len(g.nodes))
 	S := make([]string, 0, len(g.nodes))
 
@@ -94,8 +164,43 @@ func (g *Graph) Toposort() ([]string, bool) {
 	}
 
 	if N > 0 {
-		return L, false
+		return L, ErrCycle
 	}
 
-	return L, true
+	return L, nil
+}
+
+func (g *Graph) initialize() {
+	if g.objects != nil {
+		return
+	}
+	g.nodes = make([]string, 0)
+	g.inputs = make(map[string]int)
+	g.outputs = make(map[string]map[string]int)
+	g.objects = make(map[string]Interface)
+}
+
+func clone(g *Graph) *Graph {
+	if g == nil {
+		return nil
+	}
+	var h Graph
+	h.nodes = make([]string, len(g.nodes))
+	copy(h.nodes, g.nodes)
+	h.inputs = make(map[string]int, len(g.inputs))
+	for k, v := range g.inputs {
+		h.inputs[k] = v
+	}
+	h.outputs = make(map[string]map[string]int, len(g.outputs))
+	for k, v := range g.outputs {
+		h.outputs[k] = make(map[string]int, len(v))
+		for ik, iv := range v {
+			h.outputs[k][ik] = iv
+		}
+	}
+	h.objects = make(map[string]Interface, len(g.objects))
+	for k, v := range g.objects {
+		h.objects[k] = v
+	}
+	return &h
 }
