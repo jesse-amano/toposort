@@ -22,7 +22,7 @@ func NewGraph(cap int) *Graph {
 // If element does not satisfy toposort.Interface but is already
 // a string or stringer, it will be converted to a toposort.Interface
 // value whose Name is equal to the string value of element.
-func (g *Graph) AddNode(element interface{}) bool {
+func (g *Graph) AddNode(element interface{}) error {
 	if el, ok := element.(Interface); ok {
 		return g.addNode(el)
 	}
@@ -32,13 +32,13 @@ func (g *Graph) AddNode(element interface{}) bool {
 	if str, ok := element.(stringer); ok {
 		return g.addNode(stringElement(str.String()))
 	}
-	return false
+	return ErrUnsupportedType
 }
 
-func (g *Graph) addNode(element Interface) bool {
+func (g *Graph) addNode(element Interface) error {
 	name := element.Name()
 	if _, ok := g.outputs[name]; ok {
-		return false
+		return ErrNodeExists
 	}
 
 	g.objects[name] = element
@@ -46,32 +46,32 @@ func (g *Graph) addNode(element Interface) bool {
 
 	g.outputs[name] = make(map[string]int)
 	g.inputs[name] = 0
-	return true
+	return nil
 }
 
 // AddNodes is a convenience method to add multiple nodes at once.
-func (g *Graph) AddNodes(elements ...interface{}) bool {
+func (g *Graph) AddNodes(elements ...interface{}) error {
 	for _, e := range elements {
-		if ok := g.AddNode(e); !ok {
-			return false
+		if err := g.AddNode(e); err != nil {
+			return err
 		}
 	}
-	return true
+	return nil
 }
 
 // AddEdge creates a directed edge from one node to another.
 // The first edge will be required to appear before the second
 // when the graph is traversed in topological order.
-func (g *Graph) AddEdge(from, to string) bool {
+func (g *Graph) AddEdge(from, to string) error {
 	m, ok := g.outputs[from]
 	if !ok {
-		return false
+		return ErrNodeNotFound
 	}
 
 	m[to] = len(m) + 1
 	g.inputs[to]++
 
-	return true
+	return nil
 }
 
 func (g *Graph) unsafeRemoveEdge(from, to string) {
@@ -80,32 +80,33 @@ func (g *Graph) unsafeRemoveEdge(from, to string) {
 }
 
 // RemoveEdge removes an edge from one node to another.
-func (g *Graph) RemoveEdge(from, to string) bool {
+func (g *Graph) RemoveEdge(from, to string) error {
 	if _, ok := g.outputs[from]; !ok {
-		return false
+		return ErrNodeNotFound
 	}
 	g.unsafeRemoveEdge(from, to)
-	return true
+	return nil
 }
 
 // Toposort returns a slice representing a topological ordering
 // of the nodes in the graph.
-func (g *Graph) Toposort() ([]Interface, bool) {
-	names, ok := g.toposort()
+func (g *Graph) Toposort() ([]Interface, error) {
+	names, err := g.toposort()
 	elements := make([]Interface, len(names))
-	if !ok {
-		return elements, false
+	if err != nil {
+		return elements, err
 	}
+	var ok bool
 	for i := range names {
 		elements[i], ok = g.objects[names[i]]
 		if !ok {
-			return elements, false
+			return elements, ErrNodeNotFound
 		}
 	}
-	return elements, true
+	return elements, nil
 }
 
-func (g *Graph) toposort() ([]string, bool) {
+func (g *Graph) toposort() ([]string, error) {
 	L := make([]string, 0, len(g.nodes))
 	S := make([]string, 0, len(g.nodes))
 
@@ -140,8 +141,8 @@ func (g *Graph) toposort() ([]string, bool) {
 	}
 
 	if N > 0 {
-		return L, false
+		return L, ErrCycle
 	}
 
-	return L, true
+	return L, nil
 }
