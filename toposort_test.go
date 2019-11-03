@@ -1,10 +1,13 @@
 package toposort
 
-import "testing"
+import (
+	"fmt"
+	"testing"
+)
 
-func index(s []string, v string) int {
+func index(s []Interface, v string) int {
 	for i, s := range s {
-		if s == v {
+		if s.Name() == v {
 			return i
 		}
 	}
@@ -22,7 +25,6 @@ func TestDuplicatedNode(t *testing.T) {
 	if graph.AddNode("a") {
 		t.Errorf("not raising duplicated node error")
 	}
-
 }
 
 func TestRemoveNotExistEdge(t *testing.T) {
@@ -80,4 +82,62 @@ func TestCycle(t *testing.T) {
 	if ok {
 		t.Errorf("closed path not detected in closed pathed graph")
 	}
+}
+
+func TestStructured(t *testing.T) {
+	baskets := []basket{
+		{count: 2, fruit: "bananas"},
+		{count: 3, fruit: "cantaloupes"},
+		{count: 5, fruit: "elderberries"},
+		{count: 7, fruit: "grapes"},
+		{count: 8, fruit: "honeydew melons"},
+		{count: 9, fruit: "idared apples"},
+		{count: 10, fruit: "jackfruit"},
+		{count: 11, fruit: "kumquat"},
+	}
+
+	graph := NewGraph(len(baskets))
+	for _, b := range baskets {
+		graph.AddNode(b)
+	}
+
+	edges := []Edge{
+		{"7 grapes", "8 honeydew melons"},
+		{"7 grapes", "11 kumquat"},
+
+		{"5 elderberries", "11 kumquat"},
+
+		{"3 cantaloupes", "8 honeydew melons"},
+		{"3 cantaloupes", "10 jackfruit"},
+
+		{"11 kumquat", "2 bananas"},
+		{"11 kumquat", "9 idared apples"},
+		{"11 kumquat", "10 jackfruit"},
+
+		{"8 honeydew melons", "9 idared apples"},
+	}
+
+	for _, e := range edges {
+		graph.AddEdge(e.From, e.To)
+	}
+
+	result, ok := graph.Toposort()
+	if !ok {
+		t.Errorf("closed path detected in no closed pathed graph")
+	}
+
+	for _, e := range edges {
+		if i, j := index(result, e.From), index(result, e.To); i > j {
+			t.Errorf("dependency failed: not satisfy %v(%v) > %v(%v)", e.From, i, e.To, j)
+		}
+	}
+}
+
+type basket struct {
+	count int
+	fruit string
+}
+
+func (b basket) Name() string {
+	return fmt.Sprintf("%d %s", b.count, b.fruit)
 }
